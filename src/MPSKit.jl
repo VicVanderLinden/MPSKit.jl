@@ -31,7 +31,7 @@ export leftenv, rightenv
 export find_groundstate, find_groundstate!
 export leading_boundary
 export approximate, approximate!
-export VUMPS, VOMPS, DMRG, DMRG2, IDMRG, IDMRG2, GradientGrassmann
+export VUMPS, VOMPS, DMRG, DMRG2, IDMRG, IDMRG2, NH_DMRG, GradientGrassmann
 export excitations
 export FiniteExcited, QuasiparticleAnsatz, ChepigaAnsatz, ChepigaAnsatz2
 export time_evolve, timestep, timestep!, make_time_mpo
@@ -162,6 +162,7 @@ include("algorithms/timestep/time_evolve.jl")
 include("algorithms/groundstate/vumps.jl")
 include("algorithms/groundstate/idmrg.jl")
 include("algorithms/groundstate/dmrg.jl")
+include("algorithms/groundstate/nh_dmrg.jl")
 include("algorithms/groundstate/gradient_grassmann.jl")
 include("algorithms/groundstate/find_groundstate.jl")
 
