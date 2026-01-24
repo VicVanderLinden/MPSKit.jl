@@ -18,7 +18,6 @@ export QP, LeftGaugedQP, RightGaugedQP
 # operators:
 export AbstractMPO
 export MPO, FiniteMPO, InfiniteMPO
-export JordanMPOTensor, JordanMPOTensorMap
 export MPOHamiltonian, FiniteMPOHamiltonian, InfiniteMPOHamiltonian
 export MultilineMPO
 export UntimedOperator, TimedOperator, MultipliedOperator, LazySum
@@ -31,7 +30,7 @@ export leftenv, rightenv
 export find_groundstate, find_groundstate!
 export leading_boundary
 export approximate, approximate!
-export VUMPS, VOMPS, DMRG, DMRG2, IDMRG, IDMRG2, NH_DMRG, GradientGrassmann
+export VUMPS, VOMPS, DMRG, DMRG2, NH_DMRG, NH_DMRG2, IDMRG, IDMRG2, GradientGrassmann
 export excitations
 export FiniteExcited, QuasiparticleAnsatz, ChepigaAnsatz, ChepigaAnsatz2
 export time_evolve, timestep, timestep!, make_time_mpo
@@ -97,7 +96,6 @@ include("utility/logging.jl")
 using .IterativeLoggers
 include("utility/iterativesolvers.jl")
 
-include("utility/styles.jl")
 include("utility/periodicarray.jl")
 include("utility/windowarray.jl")
 include("utility/multiline.jl")
@@ -190,8 +188,6 @@ include("algorithms/approximate/idmrg.jl")
 include("algorithms/ED.jl")
 
 include("algorithms/unionalg.jl")
-
-include("utility/show.jl")
 
 function __init__()
     Defaults.set_scheduler!()

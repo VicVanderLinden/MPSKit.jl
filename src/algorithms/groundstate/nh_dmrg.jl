@@ -1,4 +1,3 @@
-### TODO Excited states + time_evolution (SVD TRUNC IS VERY IMPORTANT HERE)
 """
 $(TYPEDEF)
 
@@ -35,7 +34,8 @@ function NH_DMRG(;
 end
 
 
-### Conjugates MPO but does not introduce adjoint spaces
+### Conjugates MPO but does not introduce adjoint spaces so that we can act like its an original hamiltonian. This is justified by the fact that bottom and top virtual spaces need to be equal for H.
+## We are also kind of assuming that the virtual degreees of freedom are the same in dual and original Hamitlonian
 function _conj_mpo_no(W::JordanMPOTensor)
     V = left_virtualspace(W) ⊗ physicalspace(W) ← physicalspace(W) ⊗ right_virtualspace(W)
     Ux = isomorphism(space(W.A)[1],space(W.A)[1]')
@@ -50,41 +50,39 @@ end
 
 
 
-function find_groundstate!(ψR::AbstractFiniteMPS,ψL::AbstractFiniteMPS, H, alg::NH_DMRG, envs = environments(ψR, H, ψR))
-     if alg.alg_eigsolve isa Lanczos
-                    @warnv 1 "Using Lanczos for non hermitian model" 
-    end
-    ϵs = map(pos -> calc_galerkin(pos, ψR, H, ψL, envs), 1:length(ψR))
+function find_groundstate!(ψR::AbstractFiniteMPS,ψL::AbstractFiniteMPS, H, alg::NH_DMRG, envs = environments(ψR, H, ψL))
+    ϵs = map(pos -> calc_galerkin(pos, ψL, H, ψR, envs), 1:length(ψL))
     ϵ = maximum(ϵs)
     log = IterLog("NH_DMRG")
     H_adj = MPO([_conj_mpo_no(H[i]) for i in 1:length(H)])
     envs1 = environments(ψR, H, ψR)
     envs2 = environments(ψL, H_adj, ψL)
     LoggingExtras.withlevel(; alg.verbosity) do
-        @infov 2 loginit!(log, ϵ, expectation_value(ψR, H, envs1))
+        @infov 2 loginit!(log, ϵ, expectation_value(ψL, H, envs1))
         for iter in 1:(alg.maxiter)
             alg_eigsolve = updatetol(alg.alg_eigsolve, iter, ϵ)
             zerovector!(ϵs)
-            for pos in [1:(length(ψR) - 1); length(ψR):-1:2]
+            for pos in [1:(length(ψL) - 1); length(ψL):-1:2]
                 h = AC_hamiltonian(pos, ψR, H, ψR, envs1)
                 h_adj = AC_hamiltonian(pos, ψL, H_adj, ψL, envs2)
-                #### TODO: bi-orthonomalization, error calculation for Bi-Arnoldi
+                #### TODO: put warning for Lancos (default) somewhere + verify the results
                 if alg_eigsolve isa BiArnoldi
-                _, vec1,vec2 = fixedpoint(h, h_adj, ψR.AC[pos],  ψL.AC[pos], :SR, alg_eigsolve) ## Automatically biorthogonal
+                _, vec1,vec2 = fixedpoint(h, h_adj, ψR.AC[pos],  ψL.AC[pos], :SR, alg_eigsolve)
+                ψR.AC[pos] = vec1
+                ψL.AC[pos] = vec2
+                envs = environments(ψR, H, ψL)
+                ϵs[pos] = max(ϵs[pos], calc_galerkin(pos, ψR, H, ψL, envs)) 
                 else
-                 _, vec1 = fixedpoint(h, ψR.AC[pos], :SR, alg_eigsolve)
-                _, vec2 = fixedpoint(h_adj, ψL.AC[pos], :SR, alg_eigsolve)
+                 _, vec = fixedpoint(h, ψR.AC[pos], :SR, alg_eigsolve)
+                ψR.AC[pos] = vec
+                _, vec = fixedpoint(h_adj, ψL.AC[pos], :SR, alg_eigsolve)
+                ψL.AC[pos] = vec
+                ϵs[pos] = max(ϵs[pos], calc_galerkin(pos, ψR, H, ψR, envs1),calc_galerkin(pos, ψL, H_adj, ψL, envs2)) ### check if error is proper! should it be both or only one?
                 end
-                ψR.AC[pos] = vec1/sqrt(dot(vec2,vec1))
-                ψL.AC[pos] = vec2/sqrt(dot(vec1,vec2))
-                @show dot(ψR.AC[pos],ψR.AC[pos])
-                @show dot(ψL.AC[pos],ψR.AC[pos])
-                @show dot(ψL.AC[pos],ψL.AC[pos])
-                ϵs[pos] = max(ϵs[pos], calc_galerkin(pos, ψR, H, ψR, envs1),calc_galerkin(pos, ψL, H_adj, ψL, envs2))
+                
             end
             ϵ = maximum(ϵs)
-
-             #### TODO: at first glance this is correct, doesnt do much
+             #### TODO: write some two way finaliser for environments
             ψR, envs1 = alg.finalize(iter, ψR, H, envs1)::Tuple{typeof(ψL), typeof(envs1)}
             ψL, envs2 = alg.finalize(iter, ψL, H_adj, envs2)::Tuple{typeof(ψR), typeof(envs2)}
 
@@ -160,7 +158,7 @@ function find_groundstate!(ψ::AbstractFiniteMPS, H, alg::NH_DMRG2, envs = envir
                 @plansor ac2[-1 -2; -3 -4] := ψ.AC[pos][-1 -2; 1] * ψ.AR[pos + 1][1 -4; -3]
                 Hac2 = AC2_hamiltonian(pos, ψ, H, ψ, envs)
                 _, newA2center = fixedpoint(Hac2, ac2, :SR, alg_eigsolve)
-                ## TODO: THIS IS CRUCIAL PART WHERE YOU SVD BASED ON BOTH LEFT AND RIGHT EIGENVALUE 
+
                 al, c, ar = svd_trunc!(newA2center; trunc = alg.trscheme, alg = alg.alg_svd)
                 normalize!(c)
                 v = @plansor ac2[1 2; 3 4] * conj(al[1 2; 5]) * conj(c[5; 6]) * conj(ar[6; 3 4])
